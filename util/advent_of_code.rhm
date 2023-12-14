@@ -11,6 +11,6 @@ export:
     aoc.find_session as find_session
   fetch_input
 
-fun fetch_input(session, year, day):
+fun fetch_input(session, year, day) :~ String:
   let s :: ReadableString = aoc.fetch_input(session, year, day, ~cache: #true)
   s.to_string()
