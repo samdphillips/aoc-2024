@@ -14,6 +14,7 @@ export:
   choice
   try
   satisfy
+  any
   label
   char
   string
@@ -120,6 +121,12 @@ fun satisfy(is_satisfied):
       if is_satisfied(tok)
       | Parsed(Ok(tok, stream.rest, Message(#false, [])), #false)
       | Parsed(Error(Message(tok, [])), #true)
+
+fun any(stream :: Stream):
+  if stream.is_empty()
+  | Parsed(Error(Message(stream, [])), #true)
+  | def tok = stream.first
+    Parsed(Ok(tok, stream.rest, Message(#false, [])), #false)
 
 fun label(name :: String, p):
   fun (stream :: Stream):

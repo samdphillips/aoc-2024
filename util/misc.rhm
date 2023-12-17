@@ -17,6 +17,7 @@ export:
   fmt
   in_lines
   in_string
+  list_to_string
   string_index
 
 expr.macro 'call_with_input_string $s:
@@ -38,6 +39,9 @@ fun in_lines(inp :: Port.Input) :~ Sequence:
 
 fun in_string(s :: String) :~ Sequence:
   base.in_string(s)
+
+fun list_to_string(cs :: List.of(Char)):
+  (base.#{list->string}(cs) :~ ReadableString).to_string()
 
 fun string_index(string :: String, char :: Char) :: NonnegInt || False:
   def i:
