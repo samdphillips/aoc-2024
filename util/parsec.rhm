@@ -185,13 +185,19 @@ fun many1(p):
 def digit:
   label("<digit>", satisfy(Char.is_numeric))
 
-fun chars_to_number(chars):
-  String.to_int(base.#{list->string}(chars))
+fun chars_to_number(sign, chars):
+  def do_sign:
+    if sign | values | fun(x): x * -1
+  do_sign(String.to_int(base.#{list->string}(chars)))
 
 def integer:
   parse_sequence:
+    sign = choice(parse_sequence:
+                    try(char(#{#\-}))
+                    pure(#false),
+                  pure(#true))
     ds = many1(digit)
-    pure(chars_to_number(ds))
+    pure(chars_to_number(sign, ds))
 
 def spaces:
   label("<whitespace>", many1(satisfy(Char.is_whitespace)))
