@@ -1,7 +1,6 @@
 #lang rhombus/static/and_meta
 
 import:
-  lib("racket/base.rkt")
   "stream.rhm" open
 
 export:
@@ -182,22 +181,24 @@ fun many1(p):
       pure(List.cons(v, vs))
   rec
 
-def digit:
-  label("<digit>", satisfy(Char.is_numeric))
+def ZERO = Char"0".to_int()
 
-fun chars_to_number(sign, chars):
-  def do_sign:
-    if sign | values | fun(x): x * -1
-  do_sign(String.to_int(base.#{list->string}(chars)))
+def digit:
+  label("<digit>",
+        sequence(satisfy(Char.is_numeric),
+                 fun (c :~ Char): pure(c.to_int() - ZERO)))
 
 def integer:
+  fun build_int(sign, ns :: List):
+    def v = for values(v = 0) (n: ns): v * 10 + n
+    if sign | v | v * -1
   parse_sequence:
     sign = choice(parse_sequence:
                     try(char(#{#\-}))
                     pure(#false),
                   pure(#true))
     ds = many1(digit)
-    pure(chars_to_number(sign, ds))
+    pure(build_int(sign, ds))
 
 def spaces:
   label("<whitespace>", many1(satisfy(Char.is_whitespace)))
@@ -251,3 +252,7 @@ check:
 check:
   parse(string("red"), [#{#\r}, #{#\e}])
   ~throws @str{got <empty> expected 'Char"d"'}
+
+check:
+  parse_string(integer, "42") ~is values(42, [])
+  parse_string(integer, "-42") ~is values(-42, [])
