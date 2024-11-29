@@ -1,0 +1,17 @@
+#lang rhombus/static
+
+import:
+  lib("racket/stream.rkt")
+
+export:
+  Stream
+
+veneer Stream(this :: satisfying(stream.#{stream?})):
+  property first:
+    stream.#{stream-first}(this)
+
+  property rest:
+    stream.#{stream-rest}(this)
+
+  method is_empty():
+    stream.#{stream-empty?}(this)

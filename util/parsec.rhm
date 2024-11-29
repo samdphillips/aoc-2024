@@ -2,7 +2,7 @@
 
 import:
   lib("racket/base.rkt")
-  rhombus/compat/stream open
+  "stream.rhm" open
 
 export:
   string_to_list
@@ -206,8 +206,8 @@ fun parse(p, s):
   match p(s)
   | Parsed(Ok(v, s, _), _): values(v, s)
   | Parsed(Error(message), _):
-      throw Exn.Fail(message.to_string(),
-                     Continuation.current_marks())
+      error(~who: #'parse,
+            message.to_string())
 
 fun parse_string(p, s :: String):
   parse(p, string_to_list(s))
@@ -233,7 +233,7 @@ check:
   fun | x(y :: Int): #true
       | x(y): #false
   parse(satisfy(x), ["asdasd"])
-  ~raises "asdasd"
+  ~throws "asdasd"
 
 check:
   def p:
@@ -250,4 +250,4 @@ check:
 
 check:
   parse(string("red"), [#{#\r}, #{#\e}])
-  ~raises "got <empty> expected '#{#\\d}'"
+  ~throws @str{got <empty> expected 'Char"d"'}
