@@ -4,7 +4,6 @@ import:
   "stream.rhm" open
 
 export:
-  string_to_list
   parse
   parse_string
 
@@ -22,10 +21,7 @@ export:
   spaces
   many1
 
-namespace R:
-  export to_string
-
-fun string_to_list(s :: String) :~ List.of(Char):
+fun string_to_list(s :: String) :: Stream:
   for List (i: 0..s.length()): s[i]
 
 class Message(token, expected :: List.of(String)):
@@ -44,11 +40,11 @@ class Message(token, expected :: List.of(String)):
   private method format_token() :: String:
     match token
     | []: "<empty>"
-    | _: R.to_string(token, ~mode: #'expr)
+    | _: str.s(token, ~mode: #'expr)
 
   private method format_expected() :: String:
     match expected
-    | []: "<empty>"
+    | []: "<unknown>"
     | [e]: e
     | es: format_expected_long(es)
 
@@ -108,6 +104,8 @@ fun choice(a_p, b_p):
         | parsed: parsed
     | parsed: parsed
 
+operator pa <|> pb: choice(pa, pb)
+
 fun satisfy(is_satisfied):
   fun (stream :: Stream):
     if stream.is_empty()
@@ -118,10 +116,11 @@ fun satisfy(is_satisfied):
       | Parsed(Error(Message(tok, [])), #true)
 
 fun any(stream :: Stream):
+  def m = "<any>"
   if stream.is_empty()
-  | Parsed(Error(Message(stream, [])), #true)
+  | Parsed(Error(Message(stream, [m])), #true)
   | def tok = stream.first
-    Parsed(Ok(tok, stream.rest, Message(#false, [])), #false)
+    Parsed(Ok(tok, stream.rest, Message(#false, [m])), #false)
 
 fun label(name :: String, p):
   fun (stream :: Stream):
@@ -140,15 +139,16 @@ fun try(p):
     | parsed: parsed
 
 fun char(char :: Char):
-  label("'" ++ to_string(char, ~mode: #'expr) ++ "'",
+  label(str.s(char, ~mode: #'expr),
         satisfy(fun (schar): char == schar))
 
 fun string(string :: String):
   def size = string.length()
-  for values(cont_p = pure(string)):
-    each i: 0..size
-    sequence(char(string[size - i - 1]),
-             fun (_ignore): cont_p)
+  label(str.s(string, ~mode: #'expr),
+        for values(cont_p = pure(string)) (i: 0..size):
+          sequence:
+            char(string[size - i - 1])
+            cont_p)
 
 meta:
   syntax_class ParseStep:
@@ -170,37 +170,55 @@ expr.macro
                                       $steps
                                       ...)'
 
-fun many1(p):
+fun manyr(p, nil, cons):
+  def empty = pure(nil)
   def rec:
     sequence:
       v = p
-      vs = choice(rec, pure([]))
-      pure(List.cons(v, vs))
-  rec
+      vs = rec <|> empty
+      pure(cons(v, vs))
+  try(rec) <|> empty
+
+fun manyl(p, init, next):
+  fun rec(acc):
+    (sequence:
+       v = p
+       rec(next(acc, v)))
+      <|> pure(acc)
+  rec(init)
+
+fun many(p):
+  manyr(p, [], List.cons)
+
+fun many1(p):
+  sequence:
+    v = p
+    vs = many(p)
+    pure(List.cons(v, vs))
 
 def ZERO = Char"0".to_int()
 
 def digit:
   label("<digit>",
-        sequence(satisfy(Char.is_numeric),
-                 fun (c :~ Char): pure(c.to_int() - ZERO)))
+        sequence:
+          c = satisfy(Char.is_numeric)
+          pure((c :~ Char).to_int() - ZERO))
 
 def integer:
-  fun build_int(sign, ns :: List):
-    def v = for values(v = 0) (n: ns): v * 10 + n
-    if sign | v | v * -1
   sequence:
-    sign = choice(sequence:
-                    try(char(#{#\-}))
-                    pure(#false),
-                  pure(#true))
-    ds = many1(digit)
-    pure(build_int(sign, ds))
+    sign
+      = (sequence:
+           try(char(#{#\-}))
+           pure(-1))
+      <|> pure(1)
+    i = digit
+    n = manyl(digit, i, fun(v, d): 10 * v + d)
+    pure(sign * n)
 
 def spaces:
   label("<whitespace>", many1(satisfy(Char.is_whitespace)))
 
-fun parse(p, s):
+fun parse(p, s :: Stream):
   match p(s)
   | Parsed(Ok(v, s, _), _): values(v, s)
   | Parsed(Error(message), _):
@@ -241,8 +259,24 @@ check:
 
 check:
   parse_string(string("red"), "re")
-  ~throws @str{got <empty> expected 'Char"d"'}
+  ~throws @str{got <empty> expected Char"d"}
 
 check:
   parse_string(integer, "42") ~is values(42, [])
   parse_string(integer, "-42") ~is values(-42, [])
+
+check:
+  parse_string(many(char(Char"a")), "aaa")
+  ~is values([Char"a", Char"a", Char"a"], [])
+
+check:
+  parse_string(many(char(Char"a")), "")
+  ~is values([], [])
+
+check:
+  parse_string(many1(char(Char"a")), "aaa")
+  ~is values([Char"a", Char"a", Char"a"], [])
+
+check:
+  parse_string(many1(char(Char"a")), "")
+  ~throws "Char\"a\""
