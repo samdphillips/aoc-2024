@@ -214,21 +214,16 @@ fun parse_string(p, s :: String):
   parse(p, string_to_list(s))
 
 check:
-  def values(results, stream) = parse(pure(42), [])
-  [results, stream]
-  ~is [42, []]
+  parse(pure(42), []) ~is values(42, [])
 
 check:
-  def values(results, stream) = parse(pure(42), ["abc"])
-  [results, stream]
-  ~is [42, ["abc"]]
+  parse(pure(42), ["abc"]) ~is values(42, ["abc"])
 
 check:
   fun | x(y :: Int): #true
       | x(y): #false
-  def values(results, stream) = parse(satisfy(x), [123])
-  [results, stream]
-  ~is [123, []]
+  parse(satisfy(x), [123])
+  ~is values(123, [])
 
 check:
   fun | x(y :: Int): #true
@@ -240,17 +235,15 @@ check:
   def p:
     parse_sequence:
       pure(42)
-  def values(results, stream) = parse(p, [])
-  [results, stream]
-  ~is [42, []]
+  parse(p, [])
+  ~is values(42, [])
 
 check:
-  def values(results, stream) = parse(string("red"), string_to_list("red"))
-  [results, stream]
-  ~is ["red", []]
+  parse_string(string("red"), "red")
+  ~is values("red", [])
 
 check:
-  parse(string("red"), [#{#\r}, #{#\e}])
+  parse_string(string("red"), "re")
   ~throws @str{got <empty> expected 'Char"d"'}
 
 check:
