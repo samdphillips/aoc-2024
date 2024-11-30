@@ -22,15 +22,11 @@ export:
   spaces
   many1
 
-  parse_sequence
-
 namespace R:
   export to_string
 
-fun string_to_list(string :: String) :~ List.of(Char):
-  for List:
-    each i: 0..string.length()
-    string[i]
+fun string_to_list(s :: String) :~ List.of(Char):
+  for List (i: 0..s.length()): s[i]
 
 class Message(token, expected :: List.of(String)):
   method replace_expected(label :: String) :: Message:
@@ -77,17 +73,17 @@ fun pure(v):
   fun (stream :: Stream):
     Parsed(Ok(v, stream, Message(#false, [])))
 
-fun sequence(p, f):
+fun seq(parser, f):
   fun (stream0 :: Stream):
-    match p(stream0)
+    match parser(stream0)
     | Parsed(Ok(v, stream1, _), #true):
         f(v)(stream1)
-    | Parsed(_, #true) && p: p
+    | Parsed(_, #true) && p_result: p_result
     | Parsed(Ok(v, stream1, _), #false):
         match f(v)(stream1)
-        | Parsed(_, #true) && p: p with (is_empty = #false)
-        | p: p
-    | p: p
+        | Parsed(_, #true) && p_result: p_result with (is_empty = #false)
+        | p_result: p_result
+    | p_result: p_result
 
 fun choice(a_p, b_p):
   fun merge_ok(v, stream, message0 :: Message, message1 :: Message):
@@ -161,21 +157,22 @@ meta:
       field var: Syntax.make_temp_id()
 
 expr.macro
-| 'parse_sequence:
+| 'sequence($p, $f)': 'seq($p, $f)'
+| 'sequence:
      $(step :: ParseStep)':
     '$step.parse ...'
-| 'parse_sequence:
+| 'sequence:
      $(step0 :: ParseStep)
      $steps
      ...':
     'sequence($step0.parse ..., fun ($step0.var):
-                                    parse_sequence:
+                                    sequence:
                                       $steps
                                       ...)'
 
 fun many1(p):
   def rec:
-    parse_sequence:
+    sequence:
       v = p
       vs = choice(rec, pure([]))
       pure(List.cons(v, vs))
@@ -192,8 +189,8 @@ def integer:
   fun build_int(sign, ns :: List):
     def v = for values(v = 0) (n: ns): v * 10 + n
     if sign | v | v * -1
-  parse_sequence:
-    sign = choice(parse_sequence:
+  sequence:
+    sign = choice(sequence:
                     try(char(#{#\-}))
                     pure(#false),
                   pure(#true))
@@ -233,7 +230,7 @@ check:
 
 check:
   def p:
-    parse_sequence:
+    sequence:
       pure(42)
   parse(p, [])
   ~is values(42, [])
