@@ -19,7 +19,10 @@ export:
   digit
   integer
   spaces
+  manyl
+  manyr
   many1
+  many
 
 fun string_to_list(s :: String) :: Stream:
   for List (i: 0..s.length()): s[i]
