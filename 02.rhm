@@ -1,0 +1,68 @@
+#lang rhombus/static
+
+import:
+  "util/advent_of_code.rhm" as aoc
+  "util/misc.rhm" open
+  rhombus/rx open
+
+@example_input(test_input1){
+7 6 4 2 1
+1 2 7 8 9
+9 7 6 2 1
+1 3 2 4 5
+8 6 4 4 1
+1 3 6 7 9
+
+}
+
+fun read_input(s) :: List.of(List.of(Int)):
+  Closeable.let in = Port.Input.open_string(s)
+  for List (line: in_lines(in)):
+    def levels_s :: List.of(String) = rx'space+'.split(line)
+    for List (level: levels_s):
+      level.to_int()
+
+fun run(s, validate):
+  def reports :~ List.of(List.of(Int)): read_input(s)
+  for values(valid = 0) (r: reports):
+    keep_when validate(r)
+    valid + 1
+
+fun validate_report(levels :: List.of(Int)) :: Boolean:
+  fun sign(n): if n < 0 | -1 | 1
+  fun step(a, b) :: Int || False:
+    let n = levels[b] - levels[a]
+    let m = math.abs(n)
+    if m > 0 && m < 4
+    | sign(n)
+    | #false
+  let d = step(0, 1)
+  d && (recur rec(i = 2):
+          i == levels.length()
+            || (block:
+                  def di = step(i - 1, i)
+                  di && di == d && rec(i + 1)))
+
+fun run1(s):
+  run(s, validate_report)
+
+module test:
+  check run1(test_input1) ~is 2
+
+module part1:
+  def input = aoc.fetch_input(aoc.find_session(), 2024, 2)
+  run1(input)
+
+fun validate_report_pd(levels :: List.of(Int)) :: Boolean:
+  for any (i: 0..levels.length()):
+    validate_report(levels.delete(i))
+
+fun run2(s):
+  run(s, validate_report_pd)
+
+module test:
+  check run2(test_input1) ~is 4
+
+module part2:
+  def input = aoc.fetch_input(aoc.find_session(), 2024, 2)
+  run2(input)
