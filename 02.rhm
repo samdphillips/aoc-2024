@@ -30,7 +30,7 @@ fun run(s, validate):
 
 fun validate_report(levels :: List.of(Int)) :: Boolean:
   fun sign(n): if n < 0 | -1 | 1
-  fun step(a, b) :: Int || False:
+  fun step(a, b) :: maybe(Int):
     let n = levels[b] - levels[a]
     let m = math.abs(n)
     if m > 0 && m < 4
