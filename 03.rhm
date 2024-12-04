@@ -1,0 +1,74 @@
+#lang rhombus/static
+
+import:
+  "util/advent_of_code.rhm" as aoc
+  "util/misc.rhm" open
+  rhombus/rx open
+
+// different at-expr brace to escape `@`
+@example_input(test_input1)|{
+xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))
+}|
+
+def num:
+  rx'digit{1..3}'
+
+def mul_pat:
+  rx'"mul(" ~~ $num "," ~~ $num ")"'
+
+// RRR: RX.matches should return List.of(Match) [or add a new method]
+
+fun all_match_ranges(pat :: RX, s :: String) :~ List.of(RXMatch):
+  recur rec(i = 0, acc :~ List = []):
+    match pat.match_range_in(s, ~start: i)
+    | RXMatch(_ .. end, _, _) && m:
+        rec(end, acc.add(m))
+    | ~else: acc
+
+fun extract_arg(m :: RXMatch, pos :: NonnegInt, s :: String) :: Int:
+  def start .. end = m[pos]
+  s.substring(start, end).to_int()
+
+fun get_puzzle_input():
+  aoc.fetch_input(aoc.find_session(), 2024, 3)
+
+fun run1(s):
+  def ms :~ List = all_match_ranges(mul_pat, s)
+  for values(sum = 0) (m: ms):
+    sum + extract_arg(m, 1, s) * extract_arg(m, 2, s)
+
+check run1(test_input1) ~is 161
+
+module part1:
+  def input = get_puzzle_input()
+  run1(input)
+
+def enhanced_mul_pat:
+  rx'"do()" || "don't()" || $mul_pat'
+
+@example_input(test_input2){
+xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))
+}
+
+fun run2(s :: String):
+  let values(_, sum):
+    for values(enabled = #true, sum = 0):
+      each m: all_match_ranges(enhanced_mul_pat, s)
+      let start..end = m.whole
+      match s.substring(start, end)
+      | rx_in'bof "don't"':
+          values(#false, sum)
+      | rx_in'bof "do"':
+          values(#true, sum)
+      | rx_in'bof "mul"':
+          values(enabled,
+                 if enabled
+                 | sum + extract_arg(m, 1, s) * extract_arg(m, 2, s)
+                 | sum)
+  sum
+
+check run2(test_input2) ~is 48
+
+module part2:
+  def input = get_puzzle_input()
+  run2(input)
