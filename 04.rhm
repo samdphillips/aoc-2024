@@ -66,7 +66,6 @@ def sw = make_next_fun(#'sw,  1, -1)
 def w  = make_next_fun(#'w,   0, -1)
 def nw = make_next_fun(#'nw, -1, -1)
 
-
 fun get_puzzle_input():
   aoc.fetch_input(aoc.find_session(), 2024, 4)
 
@@ -103,9 +102,55 @@ module part1:
   def input = get_puzzle_input()
   run1(input)
 
-fun run2(s): #void
+// This almost generalizes to part 1 (initial k test needs to change)
+fun make_next_x_fun(steps :: List):
+  fun(grid :: Grid):
+    fun make_next_x_step(dr :: Int, dc :: Int, ch :: Char, knext):
+      def g_rows = grid.rows
+      def g_cols = grid.cols
+      fun next(r, c) :~ WordState:
+        def new_r = r + dr
+        def new_c = c + dc
+        g_rows.has_element(new_r)
+          && g_cols.has_element(new_c)
+          && (block:
+                #//println(@str{checking for @ch at @new_r @new_c ==> @(grid.get(new_r, new_c))})
+                grid.get(new_r, new_c) == ch)
+          && WordState(new_r, new_c, knext)
+      next
+    def t:
+      for values(k = #false):
+        each:
+          [ch, dr, dc]: steps.reverse()
+        make_next_x_step(dr, dc, ch, k)
+    fun(r, c):
+      grid.get(r, c) == Char"A"
+        && WordState(r, c, t)
 
-// check run2(test_input1) ~is #false
+def t_mas_mas = make_next_x_fun([[Char"M", -1,-1], [Char"M", 0,2], [Char"S", 2,0], [Char"S", 0,-2]])
+def t_mas_sam = make_next_x_fun([[Char"M", -1,-1], [Char"S", 0,2], [Char"S", 2,0], [Char"M", 0,-2]])
+def t_sam_mas = make_next_x_fun([[Char"S", -1,-1], [Char"M", 0,2], [Char"M", 2,0], [Char"S", 0,-2]])
+def t_sam_sam = make_next_x_fun([[Char"S", -1,-1], [Char"S", 0,2], [Char"M", 2,0], [Char"M", 0,-2]])
+
+fun run2(input :: String):
+  def grid = Grid(input)
+  def init_state :: List.of(WordState):
+    block:
+      use_dynamic
+      for List:
+        each r: grid.rows
+        each c: grid.cols
+        each dir: [t_mas_mas, t_mas_sam, t_sam_mas, t_sam_sam]
+        WordState(r, c, dir(grid))
+  def result:
+    for values(cur_state :~ List.of(WordState) = init_state) (i: 0..5):
+      for List (s: cur_state):
+        def next = s.next()
+        keep_when next
+        next
+  result.length()
+
+check run2(test_input1) ~is 9
 
 module part2:
   def input = get_puzzle_input()
