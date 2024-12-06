@@ -1,0 +1,132 @@
+#lang rhombus/static
+
+import:
+  "util/advent_of_code.rhm" as aoc
+  "util/misc.rhm" open
+
+@example_input(test_input1){
+....#.....
+.........#
+..........
+..#.......
+.......#..
+..........
+.#..^.....
+........#.
+#.........
+......#...
+
+}
+
+class Posn(x :: Int, y :: Int):
+  implements Printable
+
+  method add(Posn(x2, y2)):
+    Posn(x + x2, y + y2)
+
+  override method describe(mode, recur):
+    @str{<@x $ @y>}
+
+operator (x $ y):
+  Posn(x, y)
+
+operator ((p1 :: Posn) $+ (p2 :: Posn)) :~ Posn:
+  p1.add(p2)
+
+def N =  0 $ -1
+def E =  1 $  0
+def S =  0 $  1
+def W = -1 $  0
+
+class Grid(lines :: List.of(String), width :: NonnegInt, height :: NonnegInt):
+  implements Indexable
+
+  property rows :~ Range: 0 .. height
+  property cols :~ Range: 0 .. width
+
+  constructor (s :: String):
+    let ls = s.split("\n")
+    super(ls, ls[0].length(), ls.length())
+
+  method find_char(ch :: Char) :: Posn:
+    recur find(y = rows.start()):
+      match lines[y].find(to_string(ch))
+      | x :: Int: x $ y
+      | ~else:
+          if in_grid(0, y + 1)
+          | find(y + 1)
+          | #false
+
+  method
+  | in_grid(Posn(x, y)):
+      in_grid(x, y)
+  | in_grid(x :: Int, y :: Int):
+      cols.has_element(x) && rows.has_element(y)
+
+  override method get(Posn(x,y) && p):
+    if in_grid(x, y)
+    | lines[y][x]
+    | #false
+
+
+fun get_puzzle_input():
+  aoc.fetch_input(aoc.find_session(), 2024, 6)
+
+fun turn(d :: Posn):
+  cond
+  | d == N: E
+  | d == E: S
+  | d == S: W
+  | d == W: N
+
+fun run1(s):
+  def g :~ Grid = Grid(s)
+  def init_pos :: Posn:
+    g.find_char(Char"^")
+      || g.find_char(Char"v")
+      || g.find_char(Char">")
+      || g.find_char(Char"<")
+  def init_dir:
+    match g[init_pos]
+    | Char"^": N
+    | Char">": E
+    | Char"v": S
+    | Char"<": W
+
+  fun step(g :: Grid, p :: Posn, d :: Posn) :: maybe(Pair.of(Posn, Posn)):
+    def np = p $+ d
+    match g[np]
+    | Char"." || Char"^" || Char"v" || Char"<" || Char">":
+        //println(@str{forward @p --> @np @d})
+        Pair(np, d)
+    | Char"#":
+        def nd = turn(d)
+        //println(@str{turn @p @d --> @nd})
+        Pair(p, nd)
+    | ~else:
+        #false
+
+  recur patrol (locs :~ Set = {init_pos},
+                pos = init_pos,
+                dir = init_dir):
+    match step(g, pos, dir)
+    | Pair(np, nd):
+        //println(@str{visited @locs})
+        patrol(locs ++ {np}, np, nd)
+    | ~else:
+        //println(@str{visited @locs})
+        locs.length()
+
+check run1(test_input1) ~is 41
+
+module part1:
+  def input = get_puzzle_input()
+  run1(input)
+
+fun run2(s): #void
+
+// check run2(test_input1) ~is #false
+
+module part2:
+  def input = get_puzzle_input()
+  run2(input)
