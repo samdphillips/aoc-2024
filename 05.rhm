@@ -1,0 +1,99 @@
+#lang rhombus/static
+
+import:
+  "util/advent_of_code.rhm" as aoc
+  "util/misc.rhm" open
+  rhombus/rx open
+
+@example_input(test_input1){
+47|53
+97|13
+97|61
+97|47
+75|29
+61|13
+75|53
+29|13
+97|29
+53|29
+61|53
+97|53
+61|29
+47|13
+75|47
+97|75
+47|61
+75|61
+47|29
+75|13
+53|13
+
+75,47,61,53,29
+97,61,53,29,13
+75,29,13
+75,97,47,61,53
+61,13,29
+97,13,75,29,47
+
+}
+
+def int_pat = rx'digit +'
+def rule_pat = rx'~~ $int_pat "|" ~~ $int_pat'
+def sep_pat = rx'"\n" blank* "\n"'
+
+fun read_input(s :: String) :: values(Set, List.of(List.of(String))):
+  fun match_end(m :: RXMatch): m.whole |> Range.end
+  def values(rules, i):
+    recur next(start = 0, acc :~ Set = Set{}):
+      match rx'$rule_pat || $sep_pat'.match_range_in(s, ~start: start)
+      | RXMatch(_, [u0..u1, v0..v1], _) && m:
+          def u = s.substring(u0, u1)
+          def v = s.substring(v0, v1)
+          next(match_end(m), acc ++ { Pair(u,v) })
+      | m :: RXMatch:
+          values(acc, match_end(m))
+  def updates:
+    block:
+      def lines :: List = rx'newline'.split(s, ~start: i)
+      for List (line: lines):
+        keep_when line != ""
+        rx'","'.split(line)
+  values(rules, updates)
+
+fun check_update(update :: List.of(String), rules :: Set):
+  def len = update.length()
+  def invalid:
+    for any:
+      each i: 0..len
+      each j: i+1..len
+      def u = update[i]
+      def v = update[j]
+      def p = Pair(v, u)
+      rules[p]
+  if invalid
+  | #false
+  | update[len div 2].to_int()
+
+fun get_puzzle_input():
+  aoc.fetch_input(aoc.find_session(), 2024, 5)
+
+fun run1(s :: String):
+  def values(rules, updates) = read_input(s)
+  for values(sum = 0) (u: updates):
+    def v = check_update(u, rules)
+    keep_when v
+    sum + v
+
+check run1(test_input1) ~is 143
+
+module part1:
+  def input = get_puzzle_input()
+  run1(input)
+
+fun run2(s): #void
+
+// check run2(test_input1) ~is #false
+
+module part2:
+  def input = get_puzzle_input()
+  run2(input)
