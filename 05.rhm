@@ -90,9 +90,30 @@ module part1:
   def input = get_puzzle_input()
   run1(input)
 
-fun run2(s): #void
+fun make_ordering(rules :: Set.of(Pair)):
+  // a function that is true when a < b
+  fun(a :: String, b :: String):
+    def s = rules[Pair(a, b)]
+    def t = rules[Pair(b, a)]
+    match Pair(s, t)
+    | Pair(#false, #false): #true
+    | Pair(#false, #true): #false
+    | Pair(#true, #false): #true
+    | ~else:
+        error(#'ordering,
+              @str{inconsistent rule detected <@a> <@b>})
 
-// check run2(test_input1) ~is #false
+fun run2(s :: String):
+  def values(rules, updates) = read_input(s)
+  def order = make_ordering(rules)
+  for values(sum = 0) (u: updates):
+    def v = check_update(u, rules)
+    keep_when !v
+    let u :~ List.of(String) = u.sort(order)
+    def mid = u[u.length() div 2].to_int()
+    sum + mid
+
+check run2(test_input1) ~is 123
 
 module part2:
   def input = get_puzzle_input()
