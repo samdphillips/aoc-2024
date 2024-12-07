@@ -146,11 +146,11 @@ fun run2(input_string):
     | Char">": E
     | Char"v": S
     | Char"<": W
-  def barriers :: Set.of(Posn):
+  def barriers :~ Set.of(Posn):
     Set(&grid.find_all(Char"#"))
 
   fun step(block :: Posn, posn :: Posn, dir :: Posn)
-    :: maybe(Pair.of(Posn, Posn)):
+    :~ maybe(Pair.of(Posn, Posn)):
       def np = posn $+ dir
       def is_blocked = if np == block | Char"#" | #false
       match is_blocked || grid[np]
@@ -163,7 +163,7 @@ fun run2(input_string):
           #false
 
   fun patrol(block, posn, dir, trace :~ Set = Set{})
-    :: values(Boolean, Trace):
+    :~ values(Boolean, Trace):
       match step(block, posn, dir)
       | Pair(np, nd) && t:
           if trace[t]
