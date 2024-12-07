@@ -1,4 +1,4 @@
-#lang rhombus/static
+#lang rhombus/static/and_meta
 
 import:
   "util/advent_of_code.rhm" as aoc
@@ -57,6 +57,13 @@ class Grid(lines :: List.of(String), width :: NonnegInt, height :: NonnegInt):
           | find(y + 1)
           | #false
 
+  method find_all(ch :: Char) :: List.of(Posn):
+    for List:
+      each y: 0 .. height
+      each x: 0 .. width
+      keep_when lines[y][x] == ch
+      x $ y
+
   method
   | in_grid(Posn(x, y)):
       in_grid(x, y)
@@ -81,37 +88,38 @@ fun turn(d :: Posn):
 
 fun run1(s):
   def g :~ Grid = Grid(s)
-  def init_pos :: Posn:
+  def init_posn :: Posn:
     g.find_char(Char"^")
       || g.find_char(Char"v")
       || g.find_char(Char">")
       || g.find_char(Char"<")
   def init_dir:
-    match g[init_pos]
+    match g[init_posn]
     | Char"^": N
     | Char">": E
     | Char"v": S
     | Char"<": W
 
-  fun step(g :: Grid, p :: Posn, d :: Posn) :: maybe(Pair.of(Posn, Posn)):
-    def np = p $+ d
+  fun step(g :: Grid, posn :: Posn, dir :: Posn) :: maybe(Pair.of(Posn, Posn)):
+    def np = posn $+ dir
     match g[np]
     | Char"." || Char"^" || Char"v" || Char"<" || Char">":
         //println(@str{forward @p --> @np @d})
-        Pair(np, d)
+        Pair(np, dir)
     | Char"#":
-        def nd = turn(d)
+        def nd = turn(dir)
         //println(@str{turn @p @d --> @nd})
-        Pair(p, nd)
+        Pair(posn, nd)
     | ~else:
         #false
 
-  recur patrol (locs :~ Set = {init_pos},
-                pos = init_pos,
+  recur patrol (locs :~ Set = {init_posn},
+                posn = init_posn,
                 dir = init_dir):
-    match step(g, pos, dir)
+    match step(g, posn, dir)
     | Pair(np, nd):
         //println(@str{visited @locs})
+        // RRR: why no Set.add ?
         patrol(locs ++ {np}, np, nd)
     | ~else:
         //println(@str{visited @locs})
@@ -123,9 +131,74 @@ module part1:
   def input = get_puzzle_input()
   run1(input)
 
-fun run2(s): #void
+annot.macro 'Trace': 'Set.of(Pair.of(Posn, Posn))'
 
-// check run2(test_input1) ~is #false
+fun run2(input_string):
+  def grid :~ Grid = Grid(input_string)
+  def init_posn :: Posn:
+    grid.find_char(Char"^")
+      || grid.find_char(Char"v")
+      || grid.find_char(Char">")
+      || grid.find_char(Char"<")
+  def init_dir :: Posn:
+    match grid[init_posn]
+    | Char"^": N
+    | Char">": E
+    | Char"v": S
+    | Char"<": W
+  def barriers :: Set.of(Posn):
+    Set(&grid.find_all(Char"#"))
+
+  fun step(block :: Posn, posn :: Posn, dir :: Posn)
+    :: maybe(Pair.of(Posn, Posn)):
+      def np = posn $+ dir
+      def is_blocked = if np == block | Char"#" | #false
+      match is_blocked || grid[np]
+      | Char"." || Char"^" || Char"v" || Char"<" || Char">":
+          Pair(np, dir)
+      | Char"#":
+          def nd = turn(dir)
+          Pair(posn, nd)
+      | ~else:
+          #false
+
+  fun patrol(block, posn, dir, trace :~ Set = Set{})
+    :: values(Boolean, Trace):
+      match step(block, posn, dir)
+      | Pair(np, nd) && t:
+          if trace[t]
+          | values(#true, trace)
+          | patrol(block, np, nd, trace ++ {t})
+      | ~else:
+          values(#false, trace)
+
+  def values(#false, init_trace) = patrol(-1 $ -1, init_posn, init_dir)
+
+  fun calc_barrier_candidates(test_x, test_y, dir) :~ Set:
+    for Set (Pair(p, d) && c: init_trace):
+      keep_when test_x(p.x) && test_y(p.y) && d == dir
+      def b = p $+ d
+      keep_when grid.in_grid(b)
+      skip_when barriers[b]
+      skip_when b == init_posn
+      b
+
+  def barrier_candidates:
+    for values(c :~ Set = Set{}) (Posn(px, py): barriers):
+      c ++ calc_barrier_candidates(math.equal(_, px), math.greater(_, py), W)
+        ++ calc_barrier_candidates(math.equal(_, px), math.less(_, py), E)
+        ++ calc_barrier_candidates(math.greater(_, px), math.equal(_, py), S)
+        ++ calc_barrier_candidates(math.less(_, px), math.equal(_, py), N)
+
+  for values(sum = 0):
+    each: i: 0..
+          barrier: barrier_candidates
+    when i mod 25 == 0 | println(@str{@i: @sum})
+    def values(is_cycle, _) = patrol(barrier, init_posn, init_dir)
+    keep_when is_cycle
+    sum + 1
+
+check run2(test_input1) ~is 6
 
 module part2:
   def input = get_puzzle_input()
