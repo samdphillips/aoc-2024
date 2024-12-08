@@ -30,17 +30,15 @@ Parameter.def all_ops = #false
 def all_ops1 = [fun(lhs, rhs): lhs - rhs, fun(lhs, rhs): lhs / rhs]
 
 fun
-| solve(lhs, [rhs], ops): lhs == rhs
+| solve(lhs, PairList[rhs], ops): lhs == rhs
 | solve(lhs, rhs, []): #false
-| solve(lhs, rhs :~ List, [rator, &ops]):
+| solve(lhs, rhs :~ PairList, [rator, &ops]):
     fun fail():
       solve(lhs, rhs, ops)
-    def rand = rhs.last
-    def new_lhs = rator(lhs, rand)
-    if new_lhs is_a NonnegInt
-    | def new_rhs = rhs.drop_last(1)
-      solve(new_lhs, new_rhs, all_ops()) || fail()
-    | fail()
+    match rator(lhs, rhs.first)
+    | lhs :: NonnegInt:
+        solve(lhs, rhs.rest, all_ops()) || fail()
+    | ~else: fail()
 
 fun get_puzzle_input():
   aoc.fetch_input(aoc.find_session(), 2024, 7)
@@ -48,8 +46,8 @@ fun get_puzzle_input():
 fun run(input_string, ops):
   parameterize {all_ops: ops}:
     def eqs = read_input(input_string)
-    for values(sum = 0) (Pair(lhs, rhs): eqs):
-      keep_when solve(lhs, rhs, all_ops())
+    for values(sum = 0) (Pair(lhs, rhs :~ List): eqs):
+      keep_when solve(lhs, PairList(&rhs.reverse()), all_ops())
       sum + lhs
 
 check run(test_input1, all_ops1) ~is 3749
