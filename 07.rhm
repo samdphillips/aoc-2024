@@ -1,0 +1,74 @@
+#lang rhombus/static
+
+import:
+  "util/advent_of_code.rhm" as aoc
+  "util/misc.rhm" open
+
+  rhombus/rx open
+
+@example_input(test_input1){
+190: 10 19
+3267: 81 40 27
+83: 17 5
+156: 15 6
+7290: 6 8 6 15
+161011: 16 10 13
+192: 17 8 14
+21037: 9 7 18 13
+292: 11 6 16 20
+
+}
+
+fun read_input(input_string :: String) :~ List:
+  for List (line: input_string.split("\n")):
+    def [lhss :: String, rhss :: String] = rx'":" space *'.split(line)
+    def rhs: for List (n: rhss.split(" ")): n.to_int()
+    Pair(lhss.to_int(), rhs)
+
+Parameter.def all_ops = #false
+
+def all_ops1 = [fun(lhs, rhs): lhs - rhs, fun(lhs, rhs): lhs / rhs]
+
+fun
+| solve(lhs, [rhs], ops): lhs == rhs
+| solve(lhs, rhs, []): #false
+| solve(lhs, rhs :~ List, [rator, &ops]):
+    fun fail():
+      solve(lhs, rhs, ops)
+    def rand = rhs.last
+    def new_lhs = rator(lhs, rand)
+    if new_lhs is_a NonnegInt
+    | def new_rhs = rhs.drop_last(1)
+      solve(new_lhs, new_rhs, all_ops()) || fail()
+    | fail()
+
+fun get_puzzle_input():
+  aoc.fetch_input(aoc.find_session(), 2024, 7)
+
+fun run(input_string, ops):
+  parameterize {all_ops: ops}:
+    def eqs = read_input(input_string)
+    for values(sum = 0) (Pair(lhs, rhs): eqs):
+      keep_when solve(lhs, rhs, all_ops())
+      sum + lhs
+
+check run(test_input1, all_ops1) ~is 3749
+
+module part1:
+  def input = get_puzzle_input()
+  run(input, all_ops1)
+
+fun inv_concat(lhs, rhs):
+  cond
+  | rhs == 0: lhs
+  | lhs mod 10 == rhs mod 10:
+      inv_concat(lhs div 10, rhs div 10)
+  | ~else: #false
+
+def all_ops2 = all_ops1.add(inv_concat)
+
+check run(test_input1, all_ops2) ~is 11387
+
+module part2:
+  def input = get_puzzle_input()
+  run(input, all_ops2)
