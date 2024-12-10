@@ -65,13 +65,20 @@ class Block(label :: maybe(NonnegInt),
     | next: next!!.last()
     | ~else: this
 
-  method find(dir, pred) :~ Block:
-    ~who: who
-    recur do_find(b :~ maybe(Block) = this):
-      cond
-      | !b: error(~who: who, "cannot find block satisfying condition")
-      | pred(b): b
-      | ~else: do_find(dir(b))
+  method find(pred,
+              ~dir: dir = Block.next,
+              ~missing: missing = fun(who):
+                          error(~who: who,
+                                "cannot find block satisfying condition"))
+    :~ Block:
+      ~who: who
+      recur do_find(b :~ maybe(Block) = this):
+        cond
+        | !b: match missing
+              | missing :: Function: missing(who)
+              | ~else: missing
+        | pred(b): b
+        | ~else: do_find(dir(b))
 
   method count(dir):
     recur do_count(b :~ maybe(Block) = this, c = 0):
@@ -109,29 +116,65 @@ class Block(label :: maybe(NonnegInt),
 
     if is_frontend | this | new_block
 
-  method copy_to(dest :: Block):
+  // method coalesce() :~ Block.Free:
+  method coalesce() :: Block.Free:
     ~who: who
-    when dest.label
+    unless this is_a Block.Free
+    | error(~who: who, "cannot coalesce non-free block",
+            error.text(~label: "block label", label),
+            error.text(~label: "block position", pos))
+    fun boundary(scan_dir) :~ Block:
+      recur find_boundary(block = this):
+        match scan_dir(block)
+        | free :: Block.Free:
+            find_boundary(free)
+        | ~else: block
+
+    def first_free = boundary(Block.prev)
+    def last_free = boundary(Block.next)
+    when first_free != last_free
+    | def new_size:
+        recur calculate_size(block :~ Block = first_free, size = 0):
+          cond
+          | block == last_free: size + block.size
+          | ~else: calculate_size(block.next, size + block.size)
+      this.size := new_size
+      this.pos := first_free.pos
+      this.prev := first_free.prev
+      this.next := last_free.next
+      relink()
+    this
+
+
+  method copy_to(dest :: Block.Free):
+    ~who: who
+    unless this is_a Block.File
     | error(~who: who,
-            "destination is not free space",
-            error.text(~label: "source label", label),
-            error.text(~label: "dest label", dest.label))
+            "source is not a file",
+            error.text(~label: "source position", pos),
+            error.text(~label: "dest position", dest.pos))
     unless size == dest.size
     | error(~who: who,
             "cannot swap blocks of different sizes",
             error.text(~label: "block size", size),
             error.text(~label: "other block size", dest.size))
 
-    when prev | prev!!.next := next
-    when next | next!!.prev := prev
+    def values(src_pos, src_prev, src_next):
+      values(pos, prev, next)
+    def values(dest_pos, dest_prev, dest_next):
+      values(dest.pos, dest.prev, dest.next)
 
-    def orig_prev = prev
-    pos := dest.pos
-    prev := dest.prev
-    next := dest.next
+    pos := dest_pos
+    prev := dest_prev
+    next := dest_next
+
+    dest.pos := src_pos
+    dest.prev := src_prev
+    dest.next := src_next
+
     relink()
-    values(find(Block.next, Block.is_free_space),
-           orig_prev?.find(Block.prev, Block.is_file))
+    dest.relink()
+    values(this, dest)
 
 
 def ZERO = Char"0".to_int()
@@ -139,7 +182,7 @@ def ZERO = Char"0".to_int()
 fun get_puzzle_input() :~ String:
   aoc.fetch_input(aoc.find_session(), 2024, 9)
 
-fun read_input(input :: String):
+fun read_input(input :: String) :: Block:
   fun read_blocks(i :: NonnegInt,
                   pos :: NonnegInt,
                   label :: NonnegInt,
@@ -173,13 +216,15 @@ fun read_input(input :: String):
   read_blocks(0, 0, 0, #false)
 
 fun defrag_part1(head :: Block.Head):
-  recur defrag1(free :: Block.Free = head.find(Block.next, Block.is_free_space),
+  recur defrag1(free :: Block.Free = head.find(~dir: Block.next,
+                                               Block.is_free_space),
                 file :: Block.File = head.last()):
     when free.pos < file.pos
     | cond
       | free.size == file.size:
-          let values(free, file) = file.copy_to(free)
-          defrag1(free, file)
+          file.copy_to(free)
+          defrag1(file.find(~dir: Block.next, Block.is_free_space),
+                  free.coalesce().find(~dir: Block.prev, Block.is_file))
       | free.size < file.size:
           defrag1(free, file.split(free.size, #false))
       | ~else:
@@ -190,27 +235,53 @@ fun checksum(head :: Block.Head):
     cond
     | !block: sum
     | block!!.label:
+        // XXX: if I was to go through this again I would calculate the
+        // triangular number part instead of looping
         def size:
           for values(size = 0) (pos: block!!.pos .. block!!.pos + block!!.size):
             size + block!!.label * pos
         do_checksum(block!!.next, sum + size)
     | ~else: do_checksum(block!!.next, sum)
 
-fun run1(input :: String):
+fun defrag_part2(head :: Block.Head):
+  fun find_free_block(pos, size) :~ maybe(Block):
+    def free :~ maybe(Block):
+      head.find(~dir: Block.next,
+                fun(b :~ Block):
+                  b is_a Block.Free
+                    && b.pos < pos
+                    && b.size >= size,
+                ~missing: #false)
+    cond
+    | !free: free
+    | size < free!!.size: free.split(size, #true)
+    | ~else: free
+
+  recur defrag1(file :: maybe(Block.File) = head.last()):
+    when file && file!!.label > 0
+    | let file :~ Block = file
+      fun is_next_file(b :~ Block):
+        b is_a Block.File && (b.label :~ NonnegInt) < file.label
+      match find_free_block(file.pos, file.size)
+      | free :: Block.Free:
+          let values(_, free :~ Block) = file.copy_to(free)
+          defrag1(free.coalesce().find(~dir: Block.prev, is_next_file))
+      | #false: defrag1(file.prev?.find(~dir: Block.prev, is_next_file))
+
+
+fun run(input :: String, defrag):
   def head = read_input(input)
-  defrag_part1(head)
+  defrag(head)
   checksum(head)
 
-check run1(test_input1) ~is 1928
+check run(test_input1, defrag_part1) ~is 1928
 
 module part1:
   def input = get_puzzle_input()
-  run1(input)
+  run(input, defrag_part1)
 
-fun run2(s): #void
-
-// check run2(test_input1) ~is #false
+check run(test_input1, defrag_part2) ~is 2858
 
 module part2:
   def input = get_puzzle_input()
-  run2(input)
+  run(input, defrag_part2)
