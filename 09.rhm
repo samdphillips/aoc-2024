@@ -1,0 +1,216 @@
+#lang rhombus/static/and_meta
+
+import:
+  "util/advent_of_code.rhm" as aoc
+  "util/misc.rhm" open
+
+@example_input(test_input1){
+2333133121414131402
+
+}
+
+class Block(label :: maybe(NonnegInt),
+            mutable size :: NonnegInt,
+            mutable pos :: NonnegInt,
+            mutable prev :~ maybe(Block),
+            mutable next :~ maybe(Block)):
+  implements Printable
+  export: Free File Head
+
+  annot.macro 'Free': 'Block && satisfying(Block.is_free_space(_))'
+  annot.macro 'File': 'Block && satisfying(Block.is_file(_))'
+  annot.macro 'Head': 'Block && satisfying(fun(b): Block.prev(b) == #false)'
+
+  override describe(mode, rec):
+    fun d4(n):
+      str.d(n, ~align: #'right, ~width: 4)
+    fun d3(n):
+      str.d(n, ~align: #'right, ~width: 3)
+    def [children, ...]:
+      recur each_child(child :~ maybe(Block) = this.first(),
+                       children :~ List = []):
+        if child
+        | def desc:
+            PrintDesc.concat(PrintDesc.newline(),
+                             "<< ",
+                             match child!!.label
+                             | #false: "free"
+                             | lbl: d4(lbl),
+                             " :: ",
+                             d3(child!!.size),
+                             " @ ",
+                             d4(child!!.pos),
+                             " >>",
+                             if this == child | " <--" | "")
+          each_child(child!!.next, children.add(desc))
+        | children
+    PrintDesc.concat("{[",
+                     PrintDesc.nest(1, children), ...,
+                     PrintDesc.newline(),
+                     "]}")
+
+  method is_file():
+    !is_free_space()
+
+  method is_free_space():
+    !label
+
+  method first() :~ Block:
+    cond
+    | prev: prev!!.first()
+    | ~else: this
+
+  method last() :~ Block:
+    cond
+    | next: next!!.last()
+    | ~else: this
+
+  method find(dir, pred) :~ Block:
+    ~who: who
+    recur do_find(b :~ maybe(Block) = this):
+      cond
+      | !b: error(~who: who, "cannot find block satisfying condition")
+      | pred(b): b
+      | ~else: do_find(dir(b))
+
+  method count(dir):
+    recur do_count(b :~ maybe(Block) = this, c = 0):
+      cond
+      | !b: c
+      | ~else: do_count(dir(b), c + 1)
+
+  method relink():
+    when prev | prev!!.next := this
+    when next | next!!.prev := this
+
+  method split(split_size :: PosInt, is_frontend :: Boolean) :~ Block:
+    ~who: who
+    unless split_size < size
+    | error(~who: who, "split size too big",
+            error.text(~label: "block size", size),
+            error.text(~label: "split size", split_size))
+
+    def values(this_size, other_size):
+      if is_frontend:
+      | values(split_size, size - split_size)
+      | values(size - split_size, split_size)
+    def new_block:
+      Block(label,
+            other_size,
+            pos + this_size,
+            this,
+            next)
+
+    size := this_size
+    next := new_block
+
+    this.relink()
+    new_block.relink()
+
+    if is_frontend | this | new_block
+
+  method copy_to(dest :: Block):
+    ~who: who
+    when dest.label
+    | error(~who: who,
+            "destination is not free space",
+            error.text(~label: "source label", label),
+            error.text(~label: "dest label", dest.label))
+    unless size == dest.size
+    | error(~who: who,
+            "cannot swap blocks of different sizes",
+            error.text(~label: "block size", size),
+            error.text(~label: "other block size", dest.size))
+
+    when prev | prev!!.next := next
+    when next | next!!.prev := prev
+
+    def orig_prev = prev
+    pos := dest.pos
+    prev := dest.prev
+    next := dest.next
+    relink()
+    values(find(Block.next, Block.is_free_space),
+           orig_prev?.find(Block.prev, Block.is_file))
+
+
+def ZERO = Char"0".to_int()
+
+fun get_puzzle_input() :~ String:
+  aoc.fetch_input(aoc.find_session(), 2024, 9)
+
+fun read_input(input :: String):
+  fun read_blocks(i :: NonnegInt,
+                  pos :: NonnegInt,
+                  label :: NonnegInt,
+                  last_block :: maybe(Block))
+    :: Block:
+      fun done(): last_block!!.first()
+      cond
+      | i < input.length():
+          def ch = input[i]
+          cond
+          | ch == Char"\n": done()
+          | ~else:
+              def size = input[i].to_int() - ZERO
+              cond
+              | size == 0: read_blocks(i+1, pos, label, last_block)
+              // is_file
+              | i mod 2 == 0:
+                  def new_block:
+                    Block(label, size, pos, last_block, #false)
+                  when last_block
+                  | last_block!!.next := new_block
+                  read_blocks(i + 1, pos + size, label + 1, new_block)
+              // is_free_space
+              | ~else:
+                  def new_block:
+                    Block(#false, size, pos, last_block, #false)
+                  when last_block
+                  | last_block!!.next := new_block
+                  read_blocks(i + 1, pos + size, label, new_block)
+      | ~else: done()
+  read_blocks(0, 0, 0, #false)
+
+fun defrag_part1(head :: Block.Head):
+  recur defrag1(free :: Block.Free = head.find(Block.next, Block.is_free_space),
+                file :: Block.File = head.last()):
+    when free.pos < file.pos
+    | cond
+      | free.size == file.size:
+          let values(free, file) = file.copy_to(free)
+          defrag1(free, file)
+      | free.size < file.size:
+          defrag1(free, file.split(free.size, #false))
+      | ~else:
+          defrag1(free.split(file.size, #true), file)
+
+fun checksum(head :: Block.Head):
+  recur do_checksum(block :: maybe(Block) = head, sum = 0):
+    cond
+    | !block: sum
+    | block!!.label:
+        def size:
+          for values(size = 0) (pos: block!!.pos .. block!!.pos + block!!.size):
+            size + block!!.label * pos
+        do_checksum(block!!.next, sum + size)
+    | ~else: do_checksum(block!!.next, sum)
+
+fun run1(input :: String):
+  def head = read_input(input)
+  defrag_part1(head)
+  checksum(head)
+
+check run1(test_input1) ~is 1928
+
+module part1:
+  def input = get_puzzle_input()
+  run1(input)
+
+fun run2(s): #void
+
+// check run2(test_input1) ~is #false
+
+module part2:
+  def input = get_puzzle_input()
+  run2(input)
