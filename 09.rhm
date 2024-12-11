@@ -116,15 +116,14 @@ class Block(label :: maybe(NonnegInt),
 
     if is_frontend | this | new_block
 
-  // method coalesce() :~ Block.Free:
-  method coalesce() :: Block.Free:
+  method coalesce() :~ Block.Free:
     ~who: who
     unless this is_a Block.Free
     | error(~who: who, "cannot coalesce non-free block",
             error.text(~label: "block label", label),
             error.text(~label: "block position", pos))
     fun boundary(scan_dir) :~ Block:
-      recur find_boundary(block = this):
+      recur find_boundary(block :~ Block = this):
         match scan_dir(block)
         | free :: Block.Free:
             find_boundary(free)
@@ -159,10 +158,12 @@ class Block(label :: maybe(NonnegInt),
             error.text(~label: "block size", size),
             error.text(~label: "other block size", dest.size))
 
+    def adjacent: dest.next == this
+
     def values(src_pos, src_prev, src_next):
-      values(pos, prev, next)
+      values(pos, if adjacent | this | prev, next)
     def values(dest_pos, dest_prev, dest_next):
-      values(dest.pos, dest.prev, dest.next)
+      values(dest.pos, dest.prev, if adjacent | dest | dest.next)
 
     pos := dest_pos
     prev := dest_prev
