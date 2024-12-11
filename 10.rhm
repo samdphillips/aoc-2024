@@ -44,7 +44,7 @@ namespace memoize:
            def k = Array($vars, ...).snapshot()
            match memo.get(k, absent)
            | _ :: Sentinel:
-               error(~who: $name, "memoized function has cycle")
+               error(~who: #'$name, "memoized function has cycle")
            | _ :: Absent:
                memo[k] := sentinel
                // XXX: an error in inner would leave a sentinel
@@ -165,9 +165,34 @@ module part1:
   def input = get_puzzle_input()
   run1(input)
 
-fun run2(s): #void
+@example_input(test_input2a){
+.....0.
+..4321.
+..5..2.
+..6543.
+..7..4.
+..8765.
+..9....
 
-// check run2(test_input1) ~is #false
+}
+
+fun run2(input):
+  def grid = Grid(input)
+  memoize.fun distinct_trails(p :: Posn):
+    match grid[p]
+    | Char"9": {[p]}
+    | ch :: Char:
+        def nch = next_char(ch)
+        for values(s :~ Set = Set()) (n: p.neighbors4()):
+          keep_when grid[n] == nch
+          each t: distinct_trails(n) :~ Set.of(List.of(Posn))
+          s ++ { [p, &t] }
+  for values(s = 0) (p: grid.find_all(Char"0")):
+    def es :~ Set.of(Posn) = distinct_trails(p)
+    s + es.length()
+
+check run2(test_input2a) ~is 3
+check run2(test_input1) ~is 81
 
 module part2:
   def input = get_puzzle_input()
