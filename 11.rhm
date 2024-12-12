@@ -62,7 +62,7 @@ fun split_number(n :: NonnegInt, i :: NonnegInt):
 fun is_even(n :: NonnegInt) :: Boolean:
   n rem 2 == 0
 
-fun step(n :: NonnegInt) :: List.of(NonnegInt):
+fun step(n :: NonnegInt) :~ List.of(NonnegInt):
   cond
   | n == 0: [1]
   | ~else:
@@ -71,33 +71,34 @@ fun step(n :: NonnegInt) :: List.of(NonnegInt):
       | split_number(n, i / 2)
       | [n * 2024]
 
-memoize.fun many(ns :: List.of(NonnegInt), k):
-  cond
-  | k == 0: ns
-  | ~else:
-      for List (n0: ns):
-        each n1: (many(step(n0), k - 1) :~ List)
-        n1
+memoize.fun stepn(n :~ NonnegInt, i :~ NonnegInt):
+  recur loop(ns :~ List = [n], i = i):
+    if i == 0
+    | ns
+    | def [rs, ...]:
+        for List (n0: ns):
+          each n1: step(n0)
+          stepn(n1, i - 1)
+      List.append(rs, ...)
+
+fun many([n, ...] :: List.of(NonnegInt), k):
+  List.append(stepn(n, k), ...)
 
 fun get_puzzle_input():
   aoc.fetch_input(aoc.find_session(), 2024, 11)
 
-fun run1(input):
+fun run(input, cycles):
   def nums = read_input(input)
-  def res :: List = many(nums, 25)
+  def res :: List = many(nums, cycles)
   res.length()
 
 module test:
-  check run1(test_input1) ~is 55312
+  check run(test_input1, 25) ~is 55312
 
 module part1:
   def input = get_puzzle_input()
-  run1(input)
-
-fun run2(s): #void
-
-// check run2(test_input1) ~is #false
+  run(input, 25)
 
 module part2:
   def input = get_puzzle_input()
-  run2(input)
+  run(input, 75)
