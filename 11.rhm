@@ -72,25 +72,20 @@ fun step(n :: NonnegInt) :~ List.of(NonnegInt):
       | [n * 2024]
 
 memoize.fun stepn(n :~ NonnegInt, i :~ NonnegInt):
-  recur loop(ns :~ List = [n], i = i):
-    if i == 0
-    | ns
-    | def [rs, ...]:
-        for List (n0: ns):
-          each n1: step(n0)
-          stepn(n1, i - 1)
-      List.append(rs, ...)
+  if i == 0
+  | 1
+  | for values(s = 0) (n0: step(n)):
+      s + stepn(n0, i - 1)
 
 fun many([n, ...] :: List.of(NonnegInt), k):
-  List.append(stepn(n, k), ...)
+  math.sum(stepn(n, k), ...)
 
 fun get_puzzle_input():
   aoc.fetch_input(aoc.find_session(), 2024, 11)
 
 fun run(input, cycles):
   def nums = read_input(input)
-  def res :: List = many(nums, cycles)
-  res.length()
+  many(nums, cycles)
 
 module test:
   check run(test_input1, 25) ~is 55312
