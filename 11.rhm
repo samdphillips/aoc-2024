@@ -19,30 +19,35 @@ namespace memoize:
   class Absent()
   def absent = Absent()
 
-  // XXX: handle return annotations
-  defn.macro '_fun $(name :: Identifier)($(arg :: bind_meta.Parsed), ...):
+  defn.macro '_fun $(name :: Identifier)($(arg :: bind_meta.Parsed), ...)
+                :~ $(res_ann :: annot_meta.Parsed):
                   $body
                   ...':
     def [vars, ...]:
       for List (v: [arg, ...]): Syntax.make_temp_id()
-    'def $name:
-       block:
-         let memo = MutableMap()
-         fun inner($arg, ...):
-           $body
-           ...
-         fun($vars, ...):
-           def k = Array($vars, ...).snapshot()
-           match memo.get(k, absent)
-           | _ :: Sentinel:
-               error(~who: #'$name, "memoized function has cycle")
-           | _ :: Absent:
-               memo[k] := sentinel
-               // XXX: an error in inner would leave a sentinel
-               def val = inner($vars, ...)
-               memo[k] := val
-               val
-           | val: val'
+    // XXX: what to do about converter annotations?
+    def values(_, res_statinfo) = annot_meta.unpack_predicate(res_ann)
+    def res_statinfo_packed = statinfo_meta.pack(res_statinfo)
+    '«def $name:
+        block:
+          let memo = MutableMap()
+          fun inner($arg, ...):
+            $body
+            ...
+          fun($vars, ...):
+            def k = Array($vars, ...).snapshot()
+            match memo.get(k, absent)
+            | _ :: Sentinel:
+                error(~who: #'$name, "memoized function has cycle")
+            | _ :: Absent:
+                memo[k] := sentinel
+                // XXX: an error in inner would leave a sentinel
+                def val = inner($vars, ...)
+                memo[k] := val
+                val
+            | val: val
+      statinfo.macro '$name':
+        '(($statinfo_meta.call_result_key, $res_statinfo_packed))'»'
 
 fun read_input(s :: String) :: List.of(NonnegInt):
   // RRR: RX.split should be annot List.of(String)
@@ -71,7 +76,7 @@ fun step(n :: NonnegInt) :~ List.of(NonnegInt):
       | split_number(n, i / 2)
       | [n * 2024]
 
-memoize.fun stepn(n :~ NonnegInt, i :~ NonnegInt):
+memoize.fun stepn(n :~ NonnegInt, i :~ NonnegInt) :~ NonnegInt:
   if i == 0
   | 1
   | for values(s = 0) (n0: step(n)):
