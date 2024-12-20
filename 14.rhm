@@ -1,0 +1,95 @@
+#lang rhombus/static/and_meta
+
+import:
+  "util/advent_of_code.rhm" as aoc
+  "util/misc.rhm" open
+  "util/grid.rhm":
+    only: Posn $ $+ $*
+    open
+  rhombus/rx open
+
+@example_input(test_input1){
+p=0,4 v=3,-3
+p=6,3 v=-1,-3
+p=10,3 v=-1,2
+p=2,0 v=2,-1
+p=0,0 v=1,3
+p=3,0 v=-2,-2
+p=7,6 v=-1,-3
+p=3,0 v=-1,-2
+p=9,3 v=2,3
+p=7,3 v=-1,2
+p=2,4 v=2,-3
+p=9,5 v=-3,-3
+
+}
+
+annot.macro 'RXMatchRange': 'RXMatch.of(Range, List.of(Range), Map)'
+
+def posint = rx'digit+'
+def int = rx'"-"?(digit+)'
+
+def robot_pat:
+  rx'"p=" ~~ $posint "," ~~ $posint " v=" ~~ $int "," ~~ $int "\n"'
+
+
+fun read_input(s :: String):
+  fun to_int(m :~ RXMatchRange, i):
+    def r :~ Range = m[i]
+    s.substring(r.start(), r.end()).to_int()
+  recur read_one(i :~ NonnegInt = 0, vs :~ List = []):
+    match robot_pat.match_range_in(s, ~start: i)
+    | m :: RXMatchRange:
+        read_one(m.whole.end(), vs.add(Pair(to_int(m, 1) $ to_int(m, 2),
+                                            to_int(m, 3) $ to_int(m, 4))))
+    | #false: vs
+
+
+fun steps(p :: Posn,
+          v :: Posn,
+          n :: NonnegInt,
+          width :: NonnegInt,
+          height :: NonnegInt):
+  def Posn(x1, y1) = p $+ v $* n
+  (x1 mod width) $ (y1 mod height)
+
+fun quadrant(p :: Posn, width :: NonnegInt, height :: NonnegInt) :: maybe(Posn):
+  fun calc_dim(u, v):
+    def d = v div 2
+    cond
+    | u < d: 0
+    | u > d: 1
+    | ~else: #false
+  def x = calc_dim(p.x, width)
+  def y = x && calc_dim(p.y, height)
+  y && (x $ y)
+
+fun get_puzzle_input():
+  aoc.fetch_input(aoc.find_session(), 2024, 14)
+
+fun run1(s, n, width, height):
+  def robots :: List.of(Pair.of(Posn, Posn)) = read_input(s)
+  def {_: v, ...}:
+    for values(quads :~ Map = {}) (Pair(rp, rv): robots):
+      def p = quadrant(steps(rp, rv, n, width, height), width, height)
+      keep_when p
+      quads ++ {p: quads.get(p, 0) + 1}
+  math.product(v, ...)
+
+module test:
+  check run1(test_input1, 100, 11, 7) ~is 12
+
+module part1:
+  def input = get_puzzle_input()
+  run1(input, 100, 101, 103)
+
+fun run2(s): #void
+
+#//
+module test:
+  check run2(test_input1) ~is #false
+
+
+module part2:
+  def input = get_puzzle_input()
+  run2(input)
