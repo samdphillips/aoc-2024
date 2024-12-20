@@ -1,0 +1,114 @@
+#lang rhombus/static/and_meta
+
+import:
+  "util/advent_of_code.rhm" as aoc
+  "util/misc.rhm" open
+  rhombus/rx open
+
+@example_input(test_input1){
+Button A: X+94, Y+34
+Button B: X+22, Y+67
+Prize: X=8400, Y=5400
+
+Button A: X+26, Y+66
+Button B: X+67, Y+21
+Prize: X=12748, Y=12176
+
+Button A: X+17, Y+86
+Button B: X+84, Y+37
+Prize: X=7870, Y=6450
+
+Button A: X+69, Y+23
+Button B: X+27, Y+71
+Prize: X=18641, Y=10279
+
+}
+
+def a_cost = 3
+def b_cost = 1
+
+fun get_puzzle_input():
+  aoc.fetch_input(aoc.find_session(), 2024, 4)
+
+// RRR: this should probably be built in
+annot.macro 'RXMatchRange': 'RXMatch.of(Range, List.of(Range), Map)'
+
+def button_pat:
+  rx_in'bof "Button " ["AB"] ": X+" ~~(digit+) ", Y+" ~~(digit+) eol'
+def prize_pat:
+  rx_in'bof "Prize: X=" ~~(digit+) ", Y=" ~~(digit+) "\n" (blank* "\n")?'
+
+fun read_one_machine(s :: String, i :: NonnegInt):
+  fun to_int(m :~ RXMatchRange, i):
+    def r :~ Range = m[i]
+    s.substring(r.start(), r.end()).to_int()
+  def mx :: RXMatchRange = button_pat.match_range(s, ~start: i)
+  def my :: RXMatchRange = button_pat.match_range(s, ~start: mx.whole.end() + 1)
+  def mp :: RXMatchRange = prize_pat.match_range(s, ~start: my.whole.end() + 1)
+  values(RowVect(to_int(mx, 1), to_int(my, 1), to_int(mp, 1)),
+         RowVect(to_int(mx, 2), to_int(my, 2), to_int(mp, 2)),
+         mp.whole.end())
+
+
+veneer RowVect(this :: ImmutableArray
+                 && Array.of_length(3)
+                 && Array.now_of(Number)):
+  property a: this[0]
+  property b: this[1]
+  property p: this[2]
+
+  expression 'RowVect($a, $b, $p)':
+    'Array($a, $b, $p).snapshot() :~ Array'
+
+  method add(other :: RowVect) :~ RowVect:
+    def vec:
+      for Array:
+        each: a: this :~ Array
+              b: other :~ Array
+        a + b
+    vec.snapshot()
+
+  method scale(v :: Number) :~ RowVect:
+    def vec:
+      for Array (c: this :~ Array):
+        c * v
+    vec.snapshot()
+
+fun calc_t(col_select, v1 :~ RowVect, v2 :~ RowVect) :~ Number:
+  -col_select(v1) / col_select(v2)
+
+fun solve(x_vec :~ RowVect, y_vec :~ RowVect):
+  let y_vec = y_vec.add(x_vec.scale(calc_t(RowVect.a, y_vec, x_vec)))
+  let x_vec = x_vec.add(y_vec.scale(calc_t(RowVect.b, x_vec, y_vec)))
+  unless y_vec.a == 0 && x_vec.b == 0
+  | error(~who: #'solve, "ruhroh")
+  values(x_vec.scale(1/x_vec.a),
+         y_vec.scale(1/y_vec.b))
+
+fun run1(s :: String):
+  recur one_machine(i = 0, tokens = 0):
+    cond
+    | button_pat.is_match(s, ~start: i):
+        let values(a_vec, b_vec, i) = read_one_machine(s, i)
+        def values(Array(1, 0, a_button),
+                   Array(0, 1, b_button)):
+          solve(a_vec, b_vec)
+        if a_button is_a Int && b_button is_a Int
+        | one_machine(i, tokens + a_button * a_cost + b_button * b_cost)
+        | one_machine(i, tokens)
+    | ~else: tokens
+
+module test:
+  check run1(test_input1) ~is 480
+
+module part1:
+  def input = get_puzzle_input()
+  run1(input)
+
+fun run2(s): #void
+
+// check run2(test_input1) ~is #false
+
+module part2:
+  def input = get_puzzle_input()
+  run2(input)
