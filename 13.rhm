@@ -28,7 +28,7 @@ def a_cost = 3
 def b_cost = 1
 
 fun get_puzzle_input():
-  aoc.fetch_input(aoc.find_session(), 2024, 4)
+  aoc.fetch_input(aoc.find_session(), 2024, 13)
 
 // RRR: this should probably be built in
 annot.macro 'RXMatchRange': 'RXMatch.of(Range, List.of(Range), Map)'
@@ -85,11 +85,15 @@ fun solve(x_vec :~ RowVect, y_vec :~ RowVect):
   values(x_vec.scale(1/x_vec.a),
          y_vec.scale(1/y_vec.b))
 
-fun run1(s :: String):
+fun run(s :: String, offset :: Int):
+  def offset_vec = RowVect(0, 0, offset)
   recur one_machine(i = 0, tokens = 0):
     cond
     | button_pat.is_match(s, ~start: i):
-        let values(a_vec, b_vec, i) = read_one_machine(s, i)
+        let values(a_vec :~ RowVect, b_vec :~ RowVect, i):
+          read_one_machine(s, i)
+        let a_vec = a_vec.add(offset_vec)
+        let b_vec = b_vec.add(offset_vec)
         def values(Array(1, 0, a_button),
                    Array(0, 1, b_button)):
           solve(a_vec, b_vec)
@@ -99,16 +103,15 @@ fun run1(s :: String):
     | ~else: tokens
 
 module test:
-  check run1(test_input1) ~is 480
+  check run(test_input1, 0) ~is 480
 
 module part1:
   def input = get_puzzle_input()
-  run1(input)
+  run(input, 0)
 
-fun run2(s): #void
-
-// check run2(test_input1) ~is #false
+module test:
+  check run(test_input1, 10000000000000) ~is 875318608908
 
 module part2:
   def input = get_puzzle_input()
-  run2(input)
+  run(input, 10000000000000)
