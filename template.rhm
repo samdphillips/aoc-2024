@@ -8,7 +8,7 @@ import:
 }
 
 fun get_puzzle_input():
-  aoc.fetch_input(aoc.find_session(), 2024, 4)
+  aoc.fetch_input(aoc.find_session(), 2024, #false)
 
 fun run1(s): #void
 
