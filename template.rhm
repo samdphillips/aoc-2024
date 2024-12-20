@@ -12,7 +12,9 @@ fun get_puzzle_input():
 
 fun run1(s): #void
 
-// check run1(test_input1) ~is #false
+#//
+module test:
+  check run1(test_input1) ~is #false
 
 module part1:
   def input = get_puzzle_input()
@@ -20,7 +22,10 @@ module part1:
 
 fun run2(s): #void
 
-// check run2(test_input1) ~is #false
+#//
+module test:
+  check run2(test_input1) ~is #false
+
 
 module part2:
   def input = get_puzzle_input()
