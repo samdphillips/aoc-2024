@@ -7,6 +7,8 @@ import:
     only: Posn $ $+ $*
     open
   rhombus/rx open
+  rhombus/gui open
+  rhombus/draw
 
 @example_input(test_input1){
 p=0,4 v=3,-3
@@ -33,7 +35,7 @@ def robot_pat:
   rx'"p=" ~~ $posint "," ~~ $posint " v=" ~~ $int "," ~~ $int "\n"'
 
 
-fun read_input(s :: String):
+fun read_input(s :: String) :: List:
   fun to_int(m :~ RXMatchRange, i):
     def r :~ Range = m[i]
     s.substring(r.start(), r.end()).to_int()
@@ -67,8 +69,7 @@ fun quadrant(p :: Posn, width :: NonnegInt, height :: NonnegInt) :: maybe(Posn):
 fun get_puzzle_input():
   aoc.fetch_input(aoc.find_session(), 2024, 14)
 
-fun run1(s, n, width, height):
-  def robots :: List.of(Pair.of(Posn, Posn)) = read_input(s)
+fun run(robots :~ List, n, width, height) :~ NonnegInt :
   def {_: v, ...}:
     for values(quads :~ Map = {}) (Pair(rp, rv): robots):
       def p = quadrant(steps(rp, rv, n, width, height), width, height)
@@ -77,19 +78,51 @@ fun run1(s, n, width, height):
   math.product(v, ...)
 
 module test:
-  check run1(test_input1, 100, 11, 7) ~is 12
+  check run(read_input(test_input1), 100, 11, 7) ~is 12
 
 module part1:
   def input = get_puzzle_input()
-  run1(input, 100, 101, 103)
+  run(read_input(input), 100, 101, 103)
 
-fun run2(s): #void
-
-#//
-module test:
-  check run2(test_input1) ~is #false
-
-
-module part2:
-  def input = get_puzzle_input()
-  run2(input)
+fun part2_gui(s :: String, init, width, height):
+  def scale = 5
+  def time = Obs(init)
+  def robots = read_input(s)
+  def robots_obs:
+    block:
+      def rs:
+        for List (Pair(rp, rv): robots):
+          time ~> fun(t): steps(rp, rv, t, width, height)
+      Obs.combine(List, &rs)
+  fun make_button(d, lbl):
+    fun delta(t): math.max(0, t + d)
+    Button(lbl, ~action: fun(): time <~ delta)
+  fun find_lower(n):
+    fun next(t):
+      cond
+      | run(robots, t, width, height) < n: t
+      | ~else: next(t + 1)
+    next
+  fun find_next():
+    def n = run(robots, time.peek(), width, height)
+    time <~ find_lower(n)
+  def header:
+    HPanel(make_button(-1000, "-1000"),
+           make_button(-100, "-100"),
+           make_button(-10, "-10"),
+           make_button(-1, "-1"),
+           Label(time ~> to_string),
+           Button("next", ~action: find_next),
+           make_button(1, "+1"),
+           make_button(10, "+10"),
+           make_button(100, "+100"),
+           make_button(1000, "+1000"))
+  fun paint(dc :~ draw.DC, robots :~ List.of(Posn)):
+    dc.clear()
+    for (p: robots):
+      dc.rectangle([p.x * scale, p.y * scale, scale, scale])
+  def canvas:
+    Canvas(robots_obs, paint, ~min_size: [scale * width, scale * height])
+  def window:
+    Window(VPanel(header, canvas))
+  render(window)
