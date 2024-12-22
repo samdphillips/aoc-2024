@@ -1,4 +1,4 @@
-#lang rhombus/static
+#lang rhombus/static/and_meta
 
 export:
   Posn
@@ -19,11 +19,29 @@ class Posn(x :: Int, y :: Int):
   method mul(m :: Number) :~ Posn:
     Posn(x * m, y * m)
 
+  method dist(posn :: Posn) :~ NonnegInt:
+    def dx $ dy = this $- posn
+    math.sqrt(dx ** 2 + dy ** 2)
+
   method neighbors4() :~ List.of(Posn):
     [this $+ Posn.N,
      this $+ Posn.E,
      this $+ Posn.S,
      this $+ Posn.W]
+
+  method turn_left() :~ Posn:
+    match this
+    |  0 $ -1: Posn.W
+    |  1 $  0: Posn.N
+    |  0 $  1: Posn.E
+    | -1 $  0: Posn.S
+
+  method turn_right() :~ Posn:
+    match this
+    |  0 $ -1: Posn.E
+    |  1 $  0: Posn.S
+    |  0 $  1: Posn.W
+    | -1 $  0: Posn.N
 
   override method describe(mode, recur):
     @str{@x $ @y}
@@ -31,10 +49,12 @@ class Posn(x :: Int, y :: Int):
 operator (x $ y):
   Posn(x, y)
 
-def Posn.N =  0 $ -1
-def Posn.E =  1 $  0
-def Posn.S =  0 $  1
-def Posn.W = -1 $  0
+bind.macro '$x $('$') $y': 'Posn($x, $y)'
+
+def Posn.N :~ Posn =  0 $ -1
+def Posn.E :~ Posn =  1 $  0
+def Posn.S :~ Posn =  0 $  1
+def Posn.W :~ Posn = -1 $  0
 
 operator ((p1 :: Posn) $+ (p2 :: Posn)) :~ Posn:
   p1.add(p2)

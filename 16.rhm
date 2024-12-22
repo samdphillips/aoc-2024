@@ -1,0 +1,196 @@
+#lang rhombus/static/and_meta
+
+import:
+  "util/advent_of_code.rhm" as aoc
+  "util/misc.rhm" open
+  "util/grid.rhm" open
+
+fun get_puzzle_input():
+  aoc.fetch_input(aoc.find_session(), 2024, 16)
+
+@example_input(test_input1a){
+###############
+#.......#....E#
+#.#.###.#.###.#
+#.....#.#...#.#
+#.###.#####.#.#
+#.#.#.......#.#
+#.#.#####.###.#
+#...........#.#
+###.#.#####.#.#
+#...#.....#.#.#
+#.#.#.###.#.#.#
+#.....#...#.#.#
+#.###.#.#.#.#.#
+#S..#.....#...#
+###############
+
+}
+
+@example_input(test_input1b){
+#################
+#...#...#...#..E#
+#.#.#.#.#.#.#.#.#
+#.#.#.#...#...#.#
+#.#.#.#.###.#.#.#
+#...#.#.#.....#.#
+#.#.#.#.#.#####.#
+#.#...#.#.#.....#
+#.#.#####.#.###.#
+#.#.#.......#...#
+#.#.###.#####.###
+#.#.#...#.....#.#
+#.#.#.#####.###.#
+#.#.#.........#.#
+#.#.#.#########.#
+#S#.............#
+#################
+
+}
+
+annot.macro 'State': 'Pair.of(Posn, Posn)'
+annot.macro 'Distances': 'Map.of(State, NonnegInt)'
+
+fun initial_state(grid :: Grid) :~ State:
+  Pair(grid.find_char(Char"S"), Posn.E)
+
+fun neighbors(grid :: Grid, Pair(posn, dir) :: State) :~ List.of(State):
+  let ns = [Pair(posn, dir.turn_left()),
+            Pair(posn, dir.turn_right())]
+  def fwd = posn $+ dir
+  match grid[fwd]
+  | #false || Char"#": ns
+  | ~else: ns.add(Pair(fwd, dir))
+
+fun cost(Pair(p0, d0) :~ State, Pair(p1, d1) :~ State) :~ NonnegInt:
+  ~who: who
+  cond
+  | p0 == p1 && d0 == d1:
+      error(~who: who, "shouldn't happen, same state")
+  | p0.dist(p1) > 1:
+      error(~who: who, "shouldn't happen, neighbor far away")
+  | d0 == d1: 1
+  | p0 == p1: 1000
+  | ~else:
+      error(~who: who, "shouldn't happen, illegal move")
+
+class Heap(compare :~ Function.of_arity(2)):
+  field slots :~ Array = Array.make(16, #false)
+  field last :~ NonnegInt = 0
+
+  private method parent(i):
+    (i - 1) div 2
+
+  private method children(i):
+    [2 * i + 1, 2 * i + 2]
+
+  private method is_full():
+    slots.length() == last
+
+  private method grow():
+    // XXX: there is probably a better growth factor, but I'm too tired
+    // to look it up
+    def size = slots.length() * 2
+    def old = slots
+    slots := Array.make(size)
+    slots.copy_from(0, old)
+
+  private swim(i, vi):
+    unless i == 0
+    | def h = parent(i)
+      def vh = slots[h]
+      unless compare(vh, vi)
+      | slots[h] := vi
+        slots[i] := vh
+        swim(h, vi)
+
+  method insert(v):
+    when is_full()
+    | grow()
+
+    def i = last
+    slots[last] := v
+    last := last + 1
+    swim(i, v)
+
+  private sink(i, vi):
+    fun ref(i):
+      if i < last | slots[i] | #false
+    fun sink_child(j, vj):
+      when compare(vj, vi)
+      | slots[i] := vj
+        slots[j] := vi
+        sink(j, vi)
+    def [j, k] = children(i)
+    def vj = ref(j)
+    def vk = ref(k)
+    cond
+    | vj && vk:
+        if compare(vj, vk)
+        | sink_child(j, vj)
+        | sink_child(k, vk)
+    | vj: sink_child(j, vj)
+    | ~else: #void
+
+  method remove():
+    ~who: who
+    when last == 0
+    | error(~who: who, "heap is empty")
+
+    def v = slots[0]
+    last := last - 1
+    def w = slots[last]
+    // XXX: a real implementation would probably shrink here
+    slots[0] := w
+    sink(0, w)
+    v
+
+fun compare_dists(Pair(c0 :~ NonnegInt, _), Pair(c1 :~ NonnegInt, _)):
+  c0 < c1
+
+
+fun run1(input :: String):
+  def grid = Grid(input)
+  def heap = Heap(compare_dists)
+  heap.insert(Pair(0, initial_state(grid)))
+  def posn_end :: Posn = grid.find_char(Char"E")
+  fun step(state :: State,
+           cur_dist :: NonnegInt,
+           distances :~ Distances)
+    :~ values(Distances, maybe(NonnegInt)):
+      for values(distances :~ Distances = distances,
+                 end_distance = #false):
+        break_when end_distance
+        each state_n: neighbors(grid, state)
+        skip_when distances.get(state_n, #false)
+        def dist_n = cur_dist + cost(state, state_n)
+        heap.insert(Pair(dist_n, state_n))
+        values(distances ++ { state_n: dist_n },
+               if state_n.first == posn_end | dist_n | end_distance)
+  fun search(distances :~ Distances) :: NonnegInt:
+    def Pair(cur_dist, state) = heap.remove()
+    let values(distances, final_dist) = step(state, cur_dist, distances)
+    if final_dist
+    | final_dist
+    | search(distances)
+  search({})
+
+
+module test:
+  check run1(test_input1a) ~is 7036
+  check run1(test_input1b) ~is 11048
+
+module part1:
+  def input = get_puzzle_input()
+  run1(input)
+
+fun run2(s): #void
+
+#//
+module test:
+  check run2(test_input1) ~is #false
+
+
+module part2:
+  def input = get_puzzle_input()
+  run2(input)
